@@ -85,15 +85,12 @@ local function generate_foreign_key_methods(schema)
       end
 
     elseif field.unique then
-      local function validate_unique_value(unique_value)
+      methods["select_by_" .. name] = function(self, unique_value)
         local ok, err = schema:validate_field(field, unique_value)
         if not ok then
-          error("invalid argument '" .. name .. "' (" .. err .. ")", 3)
+          local err_t = self.errors:schema_violation({ [name] = err })
+          return nil, tostring(err_t), err_t
         end
-      end
-
-      methods["select_by_" .. name] = function(self, unique_value)
-        validate_unique_value(unique_value)
 
         local row, err_t = self.strategy:select_by_field(name, unique_value)
         if err_t then
@@ -108,7 +105,11 @@ local function generate_foreign_key_methods(schema)
       end
 
       methods["update_by_" .. name] = function(self, unique_value, entity)
-        validate_unique_value(unique_value)
+        local ok, err = schema:validate_field(field, unique_value)
+        if not ok then
+          local err_t = self.errors:schema_violation({ [name] = err })
+          return nil, tostring(err_t), err_t
+        end
 
         local entity_to_update, err = self.schema:process_auto_fields(entity, "update")
         if not entity_to_update then
@@ -139,7 +140,11 @@ local function generate_foreign_key_methods(schema)
       end
 
       methods["upsert_by_" .. name] = function(self, unique_value, entity)
-        validate_unique_value(unique_value)
+        local ok, err = schema:validate_field(field, unique_value)
+        if not ok then
+          local err_t = self.errors:schema_violation({ [name] = err })
+          return nil, tostring(err_t), err_t
+        end
 
         local entity_to_upsert, err = self.schema:process_auto_fields(entity, "upsert")
         if not entity_to_upsert then
@@ -172,7 +177,11 @@ local function generate_foreign_key_methods(schema)
       end
 
       methods["delete_by_" .. name] = function(self, unique_value)
-        validate_unique_value(unique_value)
+        local ok, err = schema:validate_field(field, unique_value)
+        if not ok then
+          local err_t = self.errors:schema_violation({ [name] = err })
+          return nil, tostring(err_t), err_t
+        end
 
         local entity, err, err_t = self["select_by_" .. name](self, unique_value)
         if err then
