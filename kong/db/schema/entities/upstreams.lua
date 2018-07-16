@@ -32,7 +32,7 @@ local http_statuses = Schema.define {
 
 
 local seconds = Schema.define {
-  type = "integer",
+  type = "number",
   between = { 0, 65535 },
 }
 
