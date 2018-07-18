@@ -1,3 +1,4 @@
+local inspect = require "inspect"
 local Schema = require "kong.db.schema"
 local upstreams = require "kong.db.schema.entities.upstreams"
 
@@ -184,322 +185,149 @@ describe("load upstreams", function()
     })
   end)
 
---[[
-
-  describe("path attribute", function()
-    -- refusals
-    it("must be a string", function()
-      local service = {
-        path = false,
-      }
-
-      local ok, err = Services:validate(service)
-      assert.falsy(ok)
-      assert.equal("expected a string", err.path)
-    end)
-
-    it("must be a non-empty string", function()
-      local service = {
-        path = "",
-      }
-
-      local ok, err = Services:validate(service)
-      assert.falsy(ok)
-      assert.equal("length must be at least 1", err.path)
-    end)
-
-    it("must start with /", function()
-      local service = {
-        path = "foo",
-      }
-
-      local ok, err = Services:validate(service)
-      assert.falsy(ok)
-      assert.equal("should start with: /", err.path)
-    end)
-
-    it("must not have empty segments (/foo//bar)", function()
-      local invalid_paths = {
-        "/foo//bar",
-        "/foo/bar//",
-        "//foo/bar",
-      }
-
-      for i = 1, #invalid_paths do
-        local service = {
-          path = invalid_paths[i],
-        }
-
-        local ok, err = Services:validate(service)
-        assert.falsy(ok)
-        assert.equal("must not have empty segments", err.path)
-      end
-    end)
-
-    it("rejects badly percent-encoded values", function()
-      local invalid_paths = {
-        "/some%2words",
-        "/some%0Xwords",
-        "/some%2Gwords",
-        "/some%20words%",
-        "/some%20words%a",
-        "/some%20words%ax",
-      }
-
-      local errstr = { "%2w", "%0X", "%2G", "%", "%a", "%ax" }
-
-      for i = 1, #invalid_paths do
-        local service = {
-          path = invalid_paths[i],
-        }
-
-        local ok, err = Services:validate(service)
-        assert.falsy(ok)
-        assert.matches("invalid url-encoded value: '" .. errstr[i] .. "'",
-                       err.path, nil, true)
-      end
-    end)
-
-    -- acceptance
-    it("accepts an apex '/'", function()
-      local service = {
-        protocol = "http",
-        host = "example.com",
-        path = "/",
-        port = 80,
-      }
-
-      local ok, err = Services:validate(service)
-      assert.is_nil(err)
-      assert.is_true(ok)
-    end)
-
-    it("accepts unreserved characters from RFC 3986", function()
-      local service = {
-        protocol = "http",
-        host = "example.com",
-        path = "/abcd~user~2",
-        port = 80,
-      }
-
-      local ok, err = Services:validate(service)
-      assert.is_nil(err)
-      assert.is_true(ok)
-    end)
-
-    it("accepts properly percent-encoded values", function()
-      local valid_paths = { "/abcd%aa%10%ff%AA%FF" }
-
-      for i = 1, #valid_paths do
-        local service = {
-          protocol = "http",
-          host = "example.com",
-          path = valid_paths[i],
-          port = 80,
-        }
-
-        local ok, err = Services:validate(service)
-        assert.is_nil(err)
-        assert.is_true(ok)
-      end
-    end)
-
-    it("accepts trailing slash", function()
-      local service = {
-        protocol = "http",
-        host = "example.com",
-        path = "/ovo/",
-        port = 80,
-      }
-
-      local ok, err = Services:validate(service)
-      assert.is_true(ok)
-      assert.is_nil(err)
-    end)
-  end)
-
-  describe("host attribute", function()
-    -- refusals
-    it("must be a string", function()
-      local service = {
-        host = false,
-      }
-
-      local ok, err = Services:validate(service)
-      assert.falsy(ok)
-      assert.equal("expected a string", err.host)
-    end)
-
-    it("must be a non-empty string", function()
-      local service = {
-        host = "",
-      }
-
-      local ok, err = Services:validate(service)
-      assert.falsy(ok)
-      assert.equal("length must be at least 1", err.host)
-    end)
-
-    it("rejects invalid hostnames", function()
-      local invalid_hosts = {
-        "/example",
-        ".example",
-        "example.",
-        "example:",
-        "mock;bin",
-        "example.com/org",
-        "example-.org",
-        "example.org-",
-        "hello..example.com",
-        "hello-.example.com",
-        "*example.com",
-        "www.example*",
-        "mock*bin.com",
-      }
-
-      for i = 1, #invalid_hosts do
-        local service = {
-          host = invalid_hosts[i],
-        }
-
-        local ok, err = Services:validate(service)
-        assert.falsy(ok)
-        assert.equal("invalid value: " .. invalid_hosts[i], err.host)
-      end
-    end)
-
-    it("rejects values with a valid port", function()
-      local service = {
-        host = "example.com:80",
-      }
-
-      local ok, err = Services:validate(service)
-      assert.falsy(ok)
-      assert.equal("must not have a port", err.host)
-    end)
-
-    it("rejects values with an invalid port", function()
-      local service = {
-        host = "example.com:1000000",
-      }
-
-      local ok, err = Services:validate(service)
-      assert.falsy(ok)
-      assert.equal("must not have a port", err.host)
-    end)
-
-    -- acceptance
-    it("accepts valid hosts", function()
-      local valid_hosts = {
-        "hello.com",
-        "hello.fr",
-        "test.hello.com",
-        "1991.io",
-        "hello.COM",
-        "HELLO.com",
-        "123helloWORLD.com",
-        "example.123",
-        "example-api.com",
-        "hello.abcd",
-        "example_api.com",
-        "localhost",
-        -- below:
-        -- punycode examples from RFC3492;
-        -- https://tools.ietf.org/html/rfc3492#page-14
-        -- specifically the japanese ones as they mix
-        -- ascii with escaped characters
-        "3B-ww4c5e180e575a65lsy2b",
-        "-with-SUPER-MONKEYS-pc58ag80a8qai00g7n9n",
-        "Hello-Another-Way--fc4qua05auwb3674vfr0b",
-        "2-u9tlzr9756bt3uc0v",
-        "MajiKoi5-783gue6qz075azm5e",
-        "de-jg4avhby1noc0d",
-        "d9juau41awczczp",
-      }
-
-      for i = 1, #valid_hosts do
-        local service = {
-          protocol = "http",
-          host = valid_hosts[i],
-          port = 80,
-        }
-
-        local ok, err = Services:validate(service)
-        assert.is_nil(err)
-        assert.is_true(ok)
-      end
-    end)
-  end)
-
   describe("name attribute", function()
     -- refusals
-    it("must be a string", function()
-      local service = {
-        name = false,
-      }
-
-      local ok, err = Services:validate(service)
+    it("requires a valid name with no port", function()
+      local ok, err = Upstreams:validate({})
       assert.falsy(ok)
-      assert.equal("expected a string", err.name)
-    end)
+      assert.same({ name = "required field missing" }, err)
 
-    it("must be a non-empty string", function()
-      local service = {
-        name = "",
-      }
-
-      local ok, err = Services:validate(service)
+      ok, err = Upstreams:validate({ name = "123.123.123.123" })
       assert.falsy(ok)
-      assert.equal("length must be at least 1", err.name)
-    end)
+      assert.same({ name = "Invalid name; no ip addresses allowed" }, err)
 
-    it("rejects invalid names", function()
-      local invalid_names = {
-        "examp:le",
-        "examp;le",
-        "examp/le",
-        "examp le",
-      }
+      ok, err = Upstreams:validate({ name = "\\\\bad\\\\////name////" })
+      assert.falsy(ok)
+      assert.same({ name = "Invalid name; must be a valid hostname" }, err)
 
-      for i = 1, #invalid_names do
-        local service = {
-          name = invalid_names[i],
-        }
-
-        local ok, err = Services:validate(service)
-        assert.falsy(ok)
-        assert.equal(
-          "invalid value '" .. invalid_names[i] .. "': it must only contain alphanumeric and '., -, _, ~' characters",
-          err.name)
-      end
+      ok, err = Upstreams:validate({ name = "name:80" })
+      assert.falsy(ok)
+      assert.same({ name = "Invalid name; no port allowed" }, err)
     end)
 
     -- acceptance
     it("accepts valid names", function()
-      local valid_names = {
-        "example",
-        "EXAMPLE",
-        "exa.mp.le",
-        "3x4mp13",
-        "3x4-mp-13",
-        "3x4_mp_13",
-        "~3x4~mp~13",
-        "~3..x4~.M-p~1__3_",
+      local ok, err = Upstreams:validate({ name = "valid.host.name" })
+      assert.truthy(ok)
+      assert.is_nil(err)
+    end)
+  end)
+
+  describe("healthchecks attribute", function()
+    -- refusals
+    it("rejects invalid configurations", function()
+      local seconds = "value should be between 0 and 65535"
+      local pos_integer = "value should be between 1 and 2147483648"
+      local zero_integer = "value should be between 0 and 2147483648"
+      local status_code = "value should be between 100 and 999"
+      local integer = "expected an integer"
+      local tests = {
+        {{ active = { timeout = -1 }}, seconds },
+        {{ active = { timeout = 1e+42 }}, seconds },
+        {{ active = { concurrency = 0.5 }}, integer },
+        {{ active = { concurrency = 0 }}, pos_integer },
+        {{ active = { concurrency = -10 }}, pos_integer },
+        {{ active = { http_path = "" }}, "length must be at least 1" },
+        {{ active = { http_path = "ovo" }}, "should start with: /" },
+        {{ active = { healthy = { interval = -1 }}}, seconds },
+        {{ active = { healthy = { interval = 1e+42 }}}, seconds },
+        {{ active = { healthy = { http_statuses = 404 }}}, "expected an array" },
+        {{ active = { healthy = { http_statuses = { "ovo" }}}}, integer },
+        {{ active = { healthy = { http_statuses = { -1 }}}}, status_code },
+        {{ active = { healthy = { http_statuses = { 99 }}}}, status_code },
+        {{ active = { healthy = { http_statuses = { 1000 }}}}, status_code },
+        {{ active = { healthy = { http_statuses = { 111.314 }}}}, integer },
+        {{ active = { healthy = { successes = 0.5 }}}, integer },
+        --{{ active = { healthy = { successes = 0 }}}, "must be an integer" },
+        {{ active = { healthy = { successes = -1 }}}, zero_integer },
+        {{ active = { unhealthy = { interval = -1 }}}, seconds },
+        {{ active = { unhealthy = { interval = 1e+42 }}}, seconds },
+        {{ active = { unhealthy = { http_statuses = 404 }}}, "expected an array" },
+        {{ active = { unhealthy = { http_statuses = { "ovo" }}}}, integer },
+        {{ active = { unhealthy = { http_statuses = { -1 }}}}, status_code },
+        {{ active = { unhealthy = { http_statuses = { 99 }}}}, status_code },
+        {{ active = { unhealthy = { http_statuses = { 1000 }}}}, status_code },
+        {{ active = { unhealthy = { tcp_failures = 0.5 }}}, integer },
+        --{{ active = { unhealthy = { tcp_failures = 0 }}}, integer },
+        {{ active = { unhealthy = { tcp_failures = -1 }}}, zero_integer },
+        {{ active = { unhealthy = { timeouts = 0.5 }}}, integer },
+        --{{ active = { unhealthy = { timeouts = 0 }}}, integer },
+        {{ active = { unhealthy = { timeouts = -1 }}}, zero_integer },
+        {{ active = { unhealthy = { http_failures = 0.5 }}}, integer},
+        {{ active = { unhealthy = { http_failures = -1 }}}, zero_integer },
+        {{ passive = { healthy = { http_statuses = 404 }}}, "expected an array" },
+        {{ passive = { healthy = { http_statuses = { "ovo" }}}}, integer },
+        {{ passive = { healthy = { http_statuses = { -1 }}}}, status_code },
+        {{ passive = { healthy = { http_statuses = { 99 }}}}, status_code },
+        {{ passive = { healthy = { http_statuses = { 1000 }}}}, status_code },
+        {{ passive = { healthy = { successes = 0.5 }}}, integer },
+        --{{ passive = { healthy = { successes = 0 }}}, integer },
+        {{ passive = { healthy = { successes = -1 }}}, zero_integer },
+        {{ passive = { unhealthy = { http_statuses = 404 }}}, "expected an array" },
+        {{ passive = { unhealthy = { http_statuses = { "ovo" }}}}, integer },
+        {{ passive = { unhealthy = { http_statuses = { -1 }}}}, status_code },
+        {{ passive = { unhealthy = { http_statuses = { 99 }}}}, status_code },
+        {{ passive = { unhealthy = { http_statuses = { 1000 }}}}, status_code },
+        {{ passive = { unhealthy = { tcp_failures = 0.5 }}}, integer },
+        --{{ passive = { unhealthy = { tcp_failures = 0 }}}, integer },
+        {{ passive = { unhealthy = { tcp_failures = -1 }}}, zero_integer },
+        {{ passive = { unhealthy = { timeouts = 0.5 }}}, integer },
+        --{{ passive = { unhealthy = { timeouts = 0 }}}, integer },
+        {{ passive = { unhealthy = { timeouts = -1 }}}, zero_integer },
+        {{ passive = { unhealthy = { http_failures = 0.5 }}}, integer },
+        --{{ passive = { unhealthy = { http_failures = 0 }}}, integer },
+        {{ passive = { unhealthy = { http_failures = -1 }}}, zero_integer },
+        --]]
       }
 
-      for i = 1, #valid_names do
-        local service = {
-          protocol = "http",
-          host = "example.com",
-          port = 80,
-          name = valid_names[i]
+      for _, test in ipairs(tests) do
+        local entity = {
+          name = "x",
+          healthchecks = test[1],
         }
+        local ok, err = Upstreams:validate(entity)
+        assert.falsy(ok)
 
-        local ok, err = Services:validate(service)
+        local leaf = err
+        repeat
+          leaf = leaf[next(leaf)]
+        until type(leaf) ~= "table" or type(next(leaf)) ~= "string"
+        assert.equal(test[2], leaf, inspect(err))
+      end
+    end)
+
+    -- acceptance
+    it("accepts inputs with the correct values", function()
+      local tests = {
+        { active = { timeout = 0.5 }},
+        { active = { timeout = 1 }},
+        { active = { concurrency = 2 }},
+        { active = { http_path = "/" }},
+        { active = { http_path = "/test" }},
+        { active = { healthy = { interval = 0 }}},
+        { active = { healthy = { http_statuses = { 200, 300 } }}},
+        { active = { healthy = { successes = 2 }}},
+        { active = { unhealthy = { interval = 0 }}},
+        { active = { unhealthy = { http_statuses = { 404 }}}},
+        { active = { unhealthy = { tcp_failures = 3 }}},
+        { active = { unhealthy = { timeouts = 9 }}},
+        { active = { unhealthy = { http_failures = 2 }}},
+        { passive = { healthy = { http_statuses = { 200, 201 } }}},
+        { passive = { healthy = { successes = 2 }}},
+        { passive = { unhealthy = { http_statuses = { 400, 500 } }}},
+        { passive = { unhealthy = { tcp_failures = 8 }}},
+        { passive = { unhealthy = { timeouts = 1 }}},
+        { passive = { unhealthy = { http_failures = 2 }}},
+      }
+      for _, test in ipairs(tests) do
+        local entity = {
+          name = "x",
+          healthchecks = test,
+        }
+        local ok, err = Upstreams:validate(entity)
+        assert.truthy(ok)
         assert.is_nil(err)
-        assert.is_true(ok)
       end
     end)
   end)
-]]
 end)
