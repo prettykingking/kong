@@ -295,10 +295,13 @@ local function client_requests(n, host_or_headers, proxy_host, proxy_port)
     }
     if not res then
       fails = fails + 1
+      print("FAIL (no body)")
     elseif res.status == 200 then
       oks = oks + 1
+      print("OK ", res.status, res:read_body())
     elseif res.status > 399 then
       fails = fails + 1
+      print("FAIL ", res.status, res:read_body())
     end
     last_status = res and res.status
     client:close()
@@ -781,7 +784,7 @@ for _, strategy in helpers.each_strategy() do
 
           end)
 
-          it("perform passive health checks", function()
+          it("#perform passive health checks", function()
 
             for nfails = 1, 3 do
 
@@ -1478,7 +1481,7 @@ for _, strategy in helpers.each_strategy() do
               -----------------------------------------
 
               local _, _, status = client_requests(1, api_host)
-              assert.same(503, status)
+              assert.same(502, status)
             end)
 
           end)
