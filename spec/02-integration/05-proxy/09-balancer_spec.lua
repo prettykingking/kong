@@ -49,7 +49,7 @@ local function healthchecks_config(config)
 end
 
 
-local TEST_LOG = true -- extra verbose logging of test server
+local TEST_LOG = false -- extra verbose logging of test server
 
 
 local TIMEOUT = -1  -- marker for timeouts in http_server
@@ -1308,8 +1308,6 @@ for _, strategy in helpers.each_strategy() do
             })
             local port1 = add_target(upstream_name, localhost)
 
-os.execute("sleep 1")
-
             local api_host, api_name = add_api(upstream_name, 10, nil, nil, 0)
 
             local server1 = http_server(localhost, port1, {
@@ -1326,8 +1324,6 @@ os.execute("sleep 1")
             patch_api(api_name, nil, 60000)
 
             local port2 = add_target(upstream_name, localhost)
-
-os.execute("sleep 1")
 
             local server2 = http_server(localhost, port2, {
               10,
@@ -1456,8 +1452,6 @@ os.execute("sleep 1")
                 weight = 0, -- disable this target
               })
 
-os.execute("sleep 1")
-
               -- now go and hit the same balancer again
               -----------------------------------------
 
@@ -1481,8 +1475,6 @@ os.execute("sleep 1")
               local upstream_name = add_upstream()
               local port1 = add_target(upstream_name, localhost)
               local port2 = add_target(upstream_name, localhost)
-
-os.execute("sleep 1")
 
               local api_host = add_api(upstream_name)
 
@@ -1534,8 +1526,6 @@ os.execute("sleep 1")
 
               local port1 = add_target(upstream_name, localhost)
               local port2 = add_target(upstream_name, localhost)
-
-os.execute("sleep 1")
 
               local api_host = add_api(upstream_name)
 
