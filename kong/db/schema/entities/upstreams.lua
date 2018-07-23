@@ -126,7 +126,7 @@ local r =  {
   endpoint_key = "name",
   fields = {
     { id = typedefs.uuid, },
-    { created_at = { type = "integer", timestamp = true, auto = true }, },
+    { created_at = typedefs.auto_timestamp },
     { name = { type = "string", required = true, unique = true, custom_validator = validate_name }, },
     { hash_on = hash_on },
     { hash_fallback = hash_on },

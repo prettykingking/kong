@@ -18,7 +18,7 @@ return {
   endpoint_key = "target",
   fields = {
     { id = typedefs.uuid },
-    { created_at = { type = "integer", timestamp = true, auto = true }, },
+    { created_at = typedefs.auto_timestamp },
     { upstream   = { type = "foreign", reference = "upstreams", required = true }, },
     { target     = { type = "string", required = true, custom_validator = validate_target, }, },
     { weight     = { type = "integer", default = 100, between = { 0, 1000 }, }, },
