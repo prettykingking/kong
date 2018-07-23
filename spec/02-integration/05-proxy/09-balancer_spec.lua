@@ -312,6 +312,7 @@ end
 
 local add_upstream
 local patch_upstream
+local get_upstream
 local get_upstream_health
 local get_router_version
 local add_target
@@ -361,6 +362,14 @@ print("ADDING UPSTREAM ", upstream_name)
 
   patch_upstream = function(upstream_name, data)
     assert.same(200, api_send("PATCH", "/upstreams/" .. upstream_name, data))
+  end
+
+  get_upstream = function(upstream_name, forced_port)
+    local path = "/upstreams/" .. upstream_name
+    local status, body = api_send("GET", path, nil, forced_port)
+    if status == 200 then
+      return body
+    end
   end
 
   get_upstream_health = function(upstream_name, forced_port)
@@ -619,6 +628,62 @@ for _, strategy in helpers.each_strategy() do
             assert.same(0, server_fails)
           end)
 
+          it("can have their config partially updated", function()
+            local upstream_name = add_upstream()
+
+            patch_upstream(upstream_name, {
+              healthchecks = {
+                active = {
+                  http_path = "/status",
+                  healthy = {
+                    interval = 0,
+                    successes = 1,
+                  },
+                  unhealthy = {
+                    interval = 0,
+                    http_failures = 1,
+                  },
+                }
+              }
+            })
+
+            local updated = {
+              active = {
+                concurrency = 10,
+                healthy = {
+                  http_statuses = { 200, 302 },
+                  interval = 0,
+                  successes = 1
+                },
+                http_path = "/status",
+                timeout = 1,
+                unhealthy = {
+                  http_failures = 1,
+                  http_statuses = { 429, 404, 500, 501, 502, 503, 504, 505 },
+                  interval = 0,
+                  tcp_failures = 0,
+                  timeouts = 0
+                }
+              },
+              passive = {
+                healthy = {
+                  http_statuses = { 200, 201, 202, 203, 204, 205, 206, 207, 208, 226,
+                                    300, 301, 302, 303, 304, 305, 306, 307, 308 },
+                  successes = 0
+                },
+                unhealthy = {
+                  http_failures = 0,
+                  http_statuses = { 429, 500, 503 },
+                  tcp_failures = 0,
+                  timeouts = 0
+                }
+              }
+            }
+
+            local upstream_data = get_upstream(upstream_name)
+            assert.same(updated, upstream_data.healthchecks)
+          end)
+
           it("can be renamed without producing stale cache", function()
             -- create two upstreams, each with a target pointing to a server
             local upstreams = {}
@@ -631,8 +696,6 @@ for _, strategy in helpers.each_strategy() do
               upstreams[i].api_host = add_api(upstreams[i].name)
             end
 
-os.execute("sleep 1")
-
             -- start two servers
             local server1 = http_server(localhost, upstreams[1].port, { 1 })
             local server2 = http_server(localhost, upstreams[2].port, { 1 })
@@ -643,14 +706,10 @@ os.execute("sleep 1")
               name = new_name,
             })
 
-os.execute("sleep 1")
-
             -- rename upstream 1 to upstream 2's original name
             patch_upstream(upstreams[1].name, {
               name = upstreams[2].name,
             })
-
-os.execute("sleep 1")
 
             -- hit a request through upstream 1 using the new name
             local oks, fails, last_status = client_requests(1, upstreams[2].api_host)
@@ -693,8 +752,6 @@ os.execute("sleep 1")
             })
             local port = add_target(upstream_name, localhost)
             local _, api_name = add_api(upstream_name)
-
-os.execute("sleep 1")
 
             -- rename upstream
             local new_name = upstream_name .. "_new1"
@@ -1250,13 +1307,14 @@ os.execute("sleep 1")
               }
             })
             local port1 = add_target(upstream_name, localhost)
+
+os.execute("sleep 1")
+
             local api_host, api_name = add_api(upstream_name, 10, nil, nil, 0)
 
             local server1 = http_server(localhost, port1, {
               TIMEOUT,
             })
-
-os.execute("sleep 1")
 
             local _, _, last_status = client_requests(1, api_host)
             assert.same(504, last_status)
@@ -1268,11 +1326,12 @@ os.execute("sleep 1")
             patch_api(api_name, nil, 60000)
 
             local port2 = add_target(upstream_name, localhost)
+
+os.execute("sleep 1")
+
             local server2 = http_server(localhost, port2, {
               10,
             })
-
-os.execute("sleep 1")
 
             _, _, last_status = client_requests(10, api_host)
             assert.same(200, last_status)
@@ -1368,7 +1427,7 @@ os.execute("sleep 1")
               assert.are.equal(requests * 0.2, count3)
             end)
 
-            it("removing a target", function()
+            it("#only removing a target", function()
               local requests = SLOTS * 2 -- go round the balancer twice
 
               local upstream_name = add_upstream()
@@ -1397,7 +1456,7 @@ os.execute("sleep 1")
                 weight = 0, -- disable this target
               })
 
-os.execute("sleep 2")
+os.execute("sleep 1")
 
               -- now go and hit the same balancer again
               -----------------------------------------
@@ -1415,19 +1474,21 @@ os.execute("sleep 2")
               -- verify all requests hit server 1
               assert.are.equal(requests, count1)
             end)
-            it("modifying target weight", function()
+
+            it("#only modifying target weight", function()
               local requests = SLOTS * 2 -- go round the balancer twice
 
               local upstream_name = add_upstream()
               local port1 = add_target(upstream_name, localhost)
               local port2 = add_target(upstream_name, localhost)
+
+os.execute("sleep 1")
+
               local api_host = add_api(upstream_name)
 
               -- setup target servers
               local server1 = http_server(localhost, port1, { requests / 2 })
               local server2 = http_server(localhost, port2, { requests / 2 })
-
-os.execute("sleep 1")
 
               -- Go hit them with our test requests
               local oks = client_requests(requests, api_host)
@@ -1453,8 +1514,6 @@ os.execute("sleep 1")
               server1 = http_server(localhost, port1, { requests * 0.4 })
               server2 = http_server(localhost, port2, { requests * 0.6 })
 
-os.execute("sleep 1")
-
               -- Go hit them with our test requests
               oks = client_requests(requests, api_host)
               assert.are.equal(requests, oks)
@@ -1468,12 +1527,10 @@ os.execute("sleep 1")
               assert.are.equal(requests * 0.6, count2)
             end)
 
-            it("failure due to targets all 0 weight", function()
+            it("#only failure due to targets all 0 weight", function()
               local requests = SLOTS * 2 -- go round the balancer twice
 
               local upstream_name = add_upstream()
-
-os.execute("sleep 1")
 
               local port1 = add_target(upstream_name, localhost)
               local port2 = add_target(upstream_name, localhost)
@@ -1485,8 +1542,6 @@ os.execute("sleep 1")
               -- setup target servers
               local server1 = http_server(localhost, port1, { requests / 2 })
               local server2 = http_server(localhost, port2, { requests / 2 })
-
-os.execute("sleep 1")
 
               -- Go hit them with our test requests
               local oks = client_requests(requests, api_host)
@@ -1504,13 +1559,11 @@ os.execute("sleep 1")
               add_target(upstream_name, localhost, port1, { weight = 0 })
               add_target(upstream_name, localhost, port2, { weight = 0 })
 
-os.execute("sleep 2")
-
               -- now go and hit the same balancer again
               -----------------------------------------
 
               local _, _, status = client_requests(1, api_host)
-              assert.same(502, status)
+              assert.same(503, status)
             end)
 
           end)

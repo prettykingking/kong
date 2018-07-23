@@ -567,6 +567,7 @@ end
 -- @param target Target table with `upstream.id` field
 local function on_target_event(operation, target)
   local upstream_id = target.upstream.id
+  log(DEBUG, "ON TARGET EVENT FOR UPSTREAM ", upstream_id)
 
   singletons.cache:invalidate_local("balancer:targets:" .. upstream_id)
 
