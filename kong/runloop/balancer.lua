@@ -12,6 +12,7 @@ local log = ngx.log
 local sleep = ngx.sleep
 local min = math.min
 local max = math.max
+local inspect = require("inspect")
 
 local CRIT  = ngx.CRIT
 local ERR   = ngx.ERR
@@ -270,13 +271,16 @@ do
       healthcheckers[balancer] = hc
 
       balancer.report_http_status = function(ip, port, status)
+        log(DEBUG, "HC ", tostring(hc), " FOR BALANCER ", tostring(balancer), " REPORTING HTTP STATUS ", ip, ":", port, " ", status)
         local _, err = hc:report_http_status(ip, port, status, "passive")
+print("HC STATUS RETURN ", tostring(_))
         if err then
           log(ERR, "[healthchecks] failed reporting status: ", err)
         end
       end
 
       balancer.report_tcp_failure = function(ip, port)
+        log(DEBUG, "HC ", tostring(hc), " FOR BALANCER ", tostring(balancer), " REPORTINGTCP FAILURE ", ip, ":", port)
         local _, err = hc:report_tcp_failure(ip, port, nil, "passive")
         if err then
           log(ERR, "[healthchecks] failed reporting status: ", err)
@@ -284,6 +288,7 @@ do
       end
 
       balancer.report_timeout = function(ip, port)
+        log(DEBUG, "HC ", tostring(hc), " FOR BALANCER ", tostring(balancer), " REPORTING TIMEOUT ", ip, ":", port)
         local _, err = hc:report_timeout(ip, port, "passive")
         if err then
           log(ERR, "[healthchecks] failed reporting status: ", err)
@@ -307,6 +312,7 @@ do
         log(ERR, "[healthchecks] error creating health checker: ", err)
         return nil, err
       end
+      log(DEBUG, "HC ", tostring(healthchecker), " CREATED FOR BALANCER ", tostring(balancer))
 
       populate_healthchecker(healthchecker, balancer)
 
@@ -364,6 +370,9 @@ do
         wheelSize = upstream.slots,
         dns = dns_client,
       })
+
+    log(DEBUG, "CREATED NEW BALANCER ", tostring(balancer))
+
     if not balancer then
       return nil, err
     end
@@ -380,7 +389,11 @@ do
 
     apply_history(balancer, history, start)
 
+    log(DEBUG, "HEALTHCHECKS LOOKS LIKE ", inspect(upstream.healthcheckes))
+
     create_healthchecker(balancer, upstream)
+
+    log(DEBUG, "CREATED HC FOR BALANCER ", tostring(balancer), " HC ", tostring(healthcheckers[balancer]))
 
     -- only make the new balancer available for other requests after it
     -- is fully set up.
@@ -551,7 +564,7 @@ end
 --------------------------------------------------------------------------------
 -- Called on any changes to a target.
 -- @param operation "create", "update" or "delete"
--- @param upstream Target table with `upstream_id` field
+-- @param target Target table with `upstream.id` field
 local function on_target_event(operation, target)
   local upstream_id = target.upstream.id
 
@@ -764,6 +777,7 @@ local function execute(target, ctx)
   if dns_cache_only then
     -- retry, so balancer is already set if there was one
     balancer = target.balancer
+    log(DEBUG, "FOR TARGET ", target.ip, ":", target.port, " DNS CACHE ONLY USING BALANCER ", tostring(balancer))
 
   else
     -- first try, so try and find a matching balancer/upstream object
@@ -784,6 +798,7 @@ local function execute(target, ctx)
         target.hash_value = hash_value
       end
     end
+    log(DEBUG, "FOR TARGET ", target.ip, ":", target.port, " FIRST TRY USING BALANCER ", tostring(balancer))
   end
 
   local ip, port, hostname

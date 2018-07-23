@@ -349,8 +349,9 @@ do
     return res.status, res_body
   end
 
-  add_upstream = function(data)
-    local upstream_name = gen_sym("upstream")
+  add_upstream = function(data, name)
+    local upstream_name = name or gen_sym("upstream")
+print("ADDING UPSTREAM ", upstream_name)
     local req = utils.deep_copy(data) or {}
     req.name = req.name or upstream_name
     req.slots = req.slots or SLOTS
@@ -500,7 +501,7 @@ for _, strategy in helpers.each_strategy() do
     end)
 
     teardown(function()
-      helpers.stop_kong()
+      helpers.stop_kong("servroot", true, true)
     end)
 
     describe("#healthchecks (#cluster)", function()
@@ -630,20 +631,26 @@ for _, strategy in helpers.each_strategy() do
               upstreams[i].api_host = add_api(upstreams[i].name)
             end
 
+os.execute("sleep 1")
+
             -- start two servers
             local server1 = http_server(localhost, upstreams[1].port, { 1 })
             local server2 = http_server(localhost, upstreams[2].port, { 1 })
 
             -- rename upstream 2
-            local new_name = upstreams[2].name .. "_new"
+            local new_name = upstreams[2].name .. "_new2"
             patch_upstream(upstreams[2].name, {
               name = new_name,
             })
+
+os.execute("sleep 1")
 
             -- rename upstream 1 to upstream 2's original name
             patch_upstream(upstreams[1].name, {
               name = upstreams[2].name,
             })
+
+os.execute("sleep 1")
 
             -- hit a request through upstream 1 using the new name
             local oks, fails, last_status = client_requests(1, upstreams[2].api_host)
@@ -681,14 +688,16 @@ for _, strategy in helpers.each_strategy() do
                     interval = HEALTHCHECK_INTERVAL,
                     http_failures = 1,
                   },
-                }
+                },
               }
             })
             local port = add_target(upstream_name, localhost)
             local _, api_name = add_api(upstream_name)
 
+os.execute("sleep 1")
+
             -- rename upstream
-            local new_name = upstream_name .. "_new"
+            local new_name = upstream_name .. "_new1"
             patch_upstream(upstream_name, {
               name = new_name
             })
@@ -784,7 +793,7 @@ for _, strategy in helpers.each_strategy() do
 
           end)
 
-          it("#wip1 perform passive health checks", function()
+          it("perform passive health checks", function()
 
             for nfails = 1, 3 do
 
@@ -977,7 +986,7 @@ for _, strategy in helpers.each_strategy() do
             end
           end)
 
-          it("perform active health checks -- can detect before any proxy traffic", function()
+          it("perform active health checks -- can detect before any proxy traffic #restart", function()
 
             local nfails = 2
             local requests = SLOTS * 2 -- go round the balancer twice
@@ -1040,7 +1049,7 @@ for _, strategy in helpers.each_strategy() do
 
           end)
 
-          it("#wip perform passive health checks -- manual recovery", function()
+          it("perform passive health checks -- manual recovery", function()
 
             for nfails = 1, 3 do
               -- configure healthchecks
@@ -1226,7 +1235,7 @@ for _, strategy in helpers.each_strategy() do
             assert.are.equal(0, fails)
           end)
 
-          it("#wip perform passive health checks -- send #timeouts", function()
+          it("#only perform passive health checks -- send #timeouts", function()
 
             -- configure healthchecks
             local upstream_name = add_upstream({
@@ -1247,6 +1256,8 @@ for _, strategy in helpers.each_strategy() do
               TIMEOUT,
             })
 
+os.execute("sleep 1")
+
             local _, _, last_status = client_requests(1, api_host)
             assert.same(504, last_status)
 
@@ -1260,6 +1271,8 @@ for _, strategy in helpers.each_strategy() do
             local server2 = http_server(localhost, port2, {
               10,
             })
+
+os.execute("sleep 1")
 
             _, _, last_status = client_requests(10, api_host)
             assert.same(200, last_status)
@@ -1384,6 +1397,8 @@ for _, strategy in helpers.each_strategy() do
                 weight = 0, -- disable this target
               })
 
+os.execute("sleep 2")
+
               -- now go and hit the same balancer again
               -----------------------------------------
 
@@ -1412,6 +1427,8 @@ for _, strategy in helpers.each_strategy() do
               local server1 = http_server(localhost, port1, { requests / 2 })
               local server2 = http_server(localhost, port2, { requests / 2 })
 
+os.execute("sleep 1")
+
               -- Go hit them with our test requests
               local oks = client_requests(requests, api_host)
               assert.are.equal(requests, oks)
@@ -1436,6 +1453,8 @@ for _, strategy in helpers.each_strategy() do
               server1 = http_server(localhost, port1, { requests * 0.4 })
               server2 = http_server(localhost, port2, { requests * 0.6 })
 
+os.execute("sleep 1")
+
               -- Go hit them with our test requests
               oks = client_requests(requests, api_host)
               assert.are.equal(requests, oks)
@@ -1449,17 +1468,25 @@ for _, strategy in helpers.each_strategy() do
               assert.are.equal(requests * 0.6, count2)
             end)
 
-            it("#wip failure due to targets all 0 weight", function()
+            it("failure due to targets all 0 weight", function()
               local requests = SLOTS * 2 -- go round the balancer twice
 
               local upstream_name = add_upstream()
+
+os.execute("sleep 1")
+
               local port1 = add_target(upstream_name, localhost)
               local port2 = add_target(upstream_name, localhost)
+
+os.execute("sleep 1")
+
               local api_host = add_api(upstream_name)
 
               -- setup target servers
               local server1 = http_server(localhost, port1, { requests / 2 })
               local server2 = http_server(localhost, port2, { requests / 2 })
+
+os.execute("sleep 1")
 
               -- Go hit them with our test requests
               local oks = client_requests(requests, api_host)
@@ -1476,6 +1503,8 @@ for _, strategy in helpers.each_strategy() do
               -- modify weight for both targets, set to 0
               add_target(upstream_name, localhost, port1, { weight = 0 })
               add_target(upstream_name, localhost, port2, { weight = 0 })
+
+os.execute("sleep 2")
 
               -- now go and hit the same balancer again
               -----------------------------------------
