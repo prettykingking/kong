@@ -4,6 +4,7 @@ local Cluster   = require "resty.cassandra.cluster"
 
 local CassandraConnector   = {}
 CassandraConnector.__index = CassandraConnector
+CassandraConnector.name = "cassandra"
 
 
 function CassandraConnector.new(kong_config)

@@ -45,61 +45,58 @@ function DB.new(kong_config, strategy)
 
   local errors = Errors.new(strategy or kong_config.database)
 
-  local schemas = {}
-
-  do
-    -- load schemas
-    -- core entities are for now the only source of schemas.
-    -- TODO: support schemas from plugins entities as well.
-
-    for _, entity_name in ipairs(CORE_ENTITIES) do
-      local entity_schema = require("kong.db.schema.entities." .. entity_name)
-
-      -- validate core entities schema via metaschema
-      local ok, err_t = MetaSchema:validate(entity_schema)
-      if not ok then
-        return nil, fmt("schema of entity '%s' is invalid: %s", entity_name,
-                        tostring(errors:schema_violation(err_t)))
-      end
-
-      schemas[entity_name] = Entity.new(entity_schema)
-    end
-  end
-
-  -- load strategy
-
-  local connector, strategies, err = Strategies.new(kong_config, strategy,
-                                                    schemas, errors)
+  local connector, err = Strategies.new_connector(kong_config, strategy)
   if err then
     return nil, err
   end
 
   local daos = {}
+  local strategies = {}
 
-
-  local self   = {
-    daos       = daos,       -- each of those has the connector singleton
+  local self = setmetatable({
+    daos = daos,       -- each of those has the connector singleton
+    connector = connector,
     strategies = strategies,
-    connector  = connector,
-  }
+    errors = errors,
+  }, DB)
 
-  do
-    -- load DAOs
-
-    for _, schema in pairs(schemas) do
-      local strategy = strategies[schema.name]
-      if not strategy then
-        return nil, fmt("no strategy found for schema '%s'", schema.name)
-      end
-
-      daos[schema.name] = DAO.new(self, schema, strategy, errors)
+  for _, entity_name in ipairs(CORE_ENTITIES) do
+    local entity_table = require("kong.db.schema.entities." .. entity_name)
+    local ok, err = self:load_entity(entity_table)
+    if not ok then
+      return nil, err
     end
   end
 
   -- we are 200 OK
 
+  return self
+end
 
-  return setmetatable(self, DB)
+
+function DB:load_entity(entity_definition)
+  if type(entity_definition) ~= "table" then
+    error("entity_definition must be a table", 2)
+  end
+
+  -- validate entity definition via metaschema
+  local ok, err_t = MetaSchema:validate(entity_definition)
+  if not ok then
+    return nil, fmt("schema of entity '%s' is invalid: %s",
+                    entity_definition.name,
+                    tostring(self.errors:schema_violation(err_t)))
+  end
+
+  local schema = Entity.new(entity_definition)
+
+  local strat = Strategies.new_strategy(self.connector, schema, self.errors)
+  if not strat then
+    return nil, fmt("no strategy found for schema '%s'", schema.name)
+  end
+
+  self.daos[schema.name] = DAO.new(self, schema, strat, self.errors)
+
+  return true
 end
 
 

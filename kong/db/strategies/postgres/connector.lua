@@ -170,6 +170,7 @@ local _mt = {}
 
 
 _mt.__index = _mt
+_mt.name = "postgres"
 
 
 function _mt:connect()
