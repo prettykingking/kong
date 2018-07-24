@@ -295,13 +295,19 @@ local function client_requests(n, host_or_headers, proxy_host, proxy_port)
     }
     if not res then
       fails = fails + 1
-      print("FAIL (no body)")
+      if TEST_LOG then
+        print("FAIL (no body)")
+      end
     elseif res.status == 200 then
       oks = oks + 1
-      print("OK ", res.status, res:read_body())
+      if TEST_LOG then
+        print("OK ", res.status, res:read_body())
+      end
     elseif res.status > 399 then
       fails = fails + 1
-      print("FAIL ", res.status, res:read_body())
+      if TEST_LOG then
+        print("FAIL ", res.status, res:read_body())
+      end
     end
     last_status = res and res.status
     client:close()
@@ -352,7 +358,9 @@ do
 
   add_upstream = function(data, name)
     local upstream_name = name or gen_sym("upstream")
-print("ADDING UPSTREAM ", upstream_name)
+    if TEST_LOG then
+      print("ADDING UPSTREAM ", upstream_name)
+    end
     local req = utils.deep_copy(data) or {}
     req.name = req.name or upstream_name
     req.slots = req.slots or SLOTS
