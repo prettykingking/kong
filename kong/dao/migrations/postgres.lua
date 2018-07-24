@@ -599,25 +599,9 @@ return {
   {
     name = "2017-11-07-192100_upstream_healthchecks_2",
     up = function(_, _, dao)
-      local rows, err = dao.db:query([[
-        SELECT * FROM upstreams;
-      ]])
-      if err then
-        return err
-      end
-
-      local upstreams = require("kong.db.schema.entities.upstreams")
-      local default
-      for _, field_def in ipairs(upstreams.fields) do
-        if next(field_def) == "healthchecks" then
-          default = field_def.healthchecks.default
-          break
-        end
-      end
-      assert(default)
       local db = dao.db.new_db
-
-      for _, row in ipairs(rows) do
+      local default = db.upstreams.schema.fields.healthchecks.default
+      for row in db.upstreams:each() do
         if not row.healthchecks then
           local _, err = db.upstreams:update({
             healthchecks = default,

@@ -540,7 +540,7 @@ return {
       local default = db.upstreams.schema.fields.healthchecks.default
       for row in db.upstreams:each() do
         if not row.healthchecks then
-          local _, err = db.upstreams:update({
+          local _, err = dao.upstreams:update({
             healthchecks = default,
           }, { id = row.id })
           if err then
