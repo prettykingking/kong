@@ -538,9 +538,9 @@ return {
     up = function(_, _, dao)
       local db = dao.db.new_db
       local default = db.upstreams.schema.fields.healthchecks.default
-      for row in db.upstreams:each(10000) do
+      for row in db.upstreams:each() do
         if not row.healthchecks then
-          local _, err = dao.upstreams:update({
+          local _, err = db.upstreams:update({
             healthchecks = default,
           }, { id = row.id })
           if err then

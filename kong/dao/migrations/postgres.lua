@@ -606,12 +606,20 @@ return {
         return err
       end
 
-      local upstreams = require("kong.dao.schemas.upstreams")
-      local default = upstreams.fields.healthchecks.default
+      local upstreams = require("kong.db.schema.entities.upstreams")
+      local default
+      for _, field_def in ipairs(upstreams.fields) do
+        if next(field_def) == "healthchecks" then
+          default = field_def.healthchecks.default
+          break
+        end
+      end
+      assert(default)
+      local db = dao.db.new_db
 
       for _, row in ipairs(rows) do
         if not row.healthchecks then
-          local _, err = dao.upstreams:update({
+          local _, err = db.upstreams:update({
             healthchecks = default,
           }, { id = row.id })
           if err then
@@ -632,12 +640,14 @@ return {
         return err
       end
 
+      local db = dao.db.new_db
+
       for _, row in ipairs(rows) do
         if not row.hash_on or not row.hash_fallback then
           row.hash_on = "none"
           row.hash_fallback = "none"
           row.created_at = nil
-          local _, err = dao.upstreams:update(row, { id = row.id })
+          local _, err = db.upstreams:update(row, { id = row.id })
           if err then
             return err
           end
