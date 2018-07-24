@@ -205,8 +205,8 @@ for _, strategy in helpers.each_strategy() do
           }))
 
           local route_in_db = assert(db.routes:select({ id = route.id }))
-          assert.equal(now, route_in_db.created_at)
-          assert.equal(now, route_in_db.updated_at)
+          assert.truthy(now - route_in_db.created_at < 0.1)
+          assert.truthy(now - route_in_db.updated_at < 0.1)
         end)
 
         it("created_at/updated_at cannot be overriden", function()
@@ -987,13 +987,6 @@ for _, strategy in helpers.each_strategy() do
           end
         end)
 
-        -- no I/O
-        it("errors on invalid arg", function()
-          assert.has_error(function()
-            db.services:select_by_name(123)
-          end, "invalid argument 'name' (expected a string)")
-        end)
-
         -- I/O
         it("returns existing Service", function()
           local service = assert(db.services:select_by_name("service_1"))
@@ -1117,13 +1110,6 @@ for _, strategy in helpers.each_strategy() do
             name = "existing-service",
             host = "existing-service.com",
           }))
-        end)
-
-        -- no I/O
-        it("errors on invalid arg", function()
-          assert.has_error(function()
-            db.services:update_by_name(123)
-          end, "invalid argument 'name' (expected a string)")
         end)
 
         it("errors on invalid values", function()
@@ -1258,13 +1244,6 @@ for _, strategy in helpers.each_strategy() do
             name = "service_1",
             host = "service1.com",
           }))
-        end)
-
-        -- no I/O
-        it("errors on invalid arg", function()
-          assert.has_error(function()
-            db.services:delete_by_name(123)
-          end, "invalid argument 'name' (expected a string)")
         end)
 
         -- I/O
