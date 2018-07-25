@@ -130,25 +130,17 @@ helpers.for_each_dao(function(kong_config)
       end)
     end)
 
-    describe("errors", function()
+    describe("#errors", function()
       it("returns errors prefixed by the DB type in __tostring()", function()
-        local pg_port = kong_config.pg_port
-        local cassandra_port = kong_config.cassandra_port
-        local cassandra_timeout = kong_config.cassandra_timeout
-        finally(function()
-          kong_config.pg_port = pg_port
-          kong_config.cassandra_port = cassandra_port
-          kong_config.cassandra_timeout = cassandra_timeout
-          ngx.shared.kong_cassandra:flush_all()
-          ngx.shared.kong_cassandra:flush_expired()
-        end)
-        kong_config.pg_port = 3333
-        kong_config.cassandra_port = 3333
-        kong_config.cassandra_timeout = 1000
+
+        local db = assert(DB.new(kong_config))
+        local fact = assert(Factory.new(kong_config, db))
+
+        fact.migrations_modules = function(self)
+          return nil, "mock error"
+        end
 
         assert.error_matches(function()
-          local db = assert(DB.new(kong_config))
-          local fact = assert(Factory.new(kong_config, db))
           assert(fact:run_migrations())
         end, "[" .. kong_config.database .. " error]", nil, true)
       end)
