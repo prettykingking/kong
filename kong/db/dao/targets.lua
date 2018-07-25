@@ -9,12 +9,12 @@ local function sort_by_order(a, b)
   return a.order > b.order
 end
 
-local function clean_history(upstream_pk)
+local function clean_history(self, upstream_pk)
   -- when to cleanup: invalid-entries > (valid-ones * cleanup_factor)
   local cleanup_factor = 10
 
   --cleaning up history, check if it's necessary...
-  local target_history = kong.db.targets:for_upstream(upstream_pk, { include_inactive = true })
+  local target_history = self:for_upstream(upstream_pk, { include_inactive = true })
 
   if target_history then
     -- sort the targets
@@ -48,13 +48,13 @@ local function clean_history(upstream_pk)
     if (#cleaned == 0 and #delete > 0) or
        (#delete >= (math.max(#cleaned,1)*cleanup_factor)) then
 
-      kong.log("[Target DAO] Starting cleanup of target table for upstream ",
+      ngx.log(ngx.NOTICE, "[Target DAO] Starting cleanup of target table for upstream ",
                  tostring(upstream_pk.id))
       local cnt = 0
       for _, entry in ipairs(delete) do
         -- not sending update events, one event at the end, based on the
         -- post of the new entry should suffice to reload only once
-        kong.db.targets:delete(
+        self:delete(
           { id = entry.id },
           { quiet = true }
         )
@@ -72,7 +72,7 @@ end
 
 
 function _TARGETS:insert(entity)
-  clean_history(entity.upstream)
+  clean_history(self, entity.upstream)
   return self.super.insert(self, entity)
 end
 
