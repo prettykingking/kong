@@ -173,9 +173,6 @@ local function post_collection_endpoint(schema, foreign_schema, foreign_field_na
       self.args.post[foreign_field_name] = { id = foreign_entity.id }
     end
 
-local inspect = require"inspect"
-ngx.log(ngx.DEBUG, "POSTPOST ", inspect(self.args.post))
-
     local entity, _, err_t = db[schema.name]:insert(self.args.post)
     if err_t then
       return handle_error(err_t)
