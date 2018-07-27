@@ -42,21 +42,38 @@ end
 
 
 return {
-  ["/upstreams/:upstreams/health/"] = {
+  ["/upstreams/:upstreams/health"] = {
     GET = function(self, db)
-      local upstream, _, err_t = select_upstream(db, self.params.upstreams)
-      if err_t then
-        return endpoints.handle_error(err_t)
-      end
-
-      local targets_with_health = db.targets:for_upstream({ id = upstream.id }, { include_health = true })
       local node_id, err = public.get_node_id()
       if err then
         ngx.log(ngx.ERR, "failed getting node id: ", err)
       end
 
+      local upstream, _, err_t = select_upstream(db, self.params.upstreams)
+      if err_t then
+        return endpoints.handle_error(err_t)
+      end
+
+      local targets_with_health, _, err_t, offset =
+      db.targets:for_upstream_with_health({ id = upstream.id },
+                                          tonumber(self.args.size),
+                                          self.args.offset)
+      if not targets_with_health then
+        return endpoints.handle_error(err_t)
+      end
+
+      local next_page = ngx.null
+      if offset then
+        next_page = string.format("/upstreams/%s/health?offset=%s",
+                                  ngx.escape_uri(upstream.id),
+                                  ngx.escape_uri(offset))
+
+      end
+
       return responses.send_HTTP_OK({
         data    = targets_with_health,
+        offset  = offset,
+        next    = next_page,
         node_id = node_id,
       })
     end
@@ -68,9 +85,26 @@ return {
       if err_t then
         return endpoints.handle_error(err_t)
       end
-      local targets = db.targets:for_upstream({ id = upstream.id }, { include_inactive = true })
+      local targets, _, err_t, offset =
+        db.targets:for_upstream_raw({ id = upstream.id },
+                                    tonumber(self.args.size),
+                                    self.args.offset)
+      if not targets then
+        return endpoints.handle_error(err_t)
+      end
+
+      local next_page
+      if offset then
+        next_page = string.format("/upstreams/%s/targets/all?offset=%s",
+                                  ngx.escape_uri(upstream.id),
+                                  ngx.escape_uri(offset))
+      end
+
+
       return responses.send_HTTP_OK({
         data  = targets,
+        offset  = offset,
+        next    = next_page,
       })
     end
   },

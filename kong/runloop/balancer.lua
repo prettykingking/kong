@@ -110,11 +110,11 @@ do
   -- @param upstream_id Upstream uuid for which to load the target history
   -- @return The target history array, with target entity tables.
   local function load_targets_into_memory(upstream_id)
-    log(DEBUG, "fetching targets for upstream: ",tostring(upstream_id))
+    log(DEBUG, "fetching targets for upstream: ", tostring(upstream_id))
 
-    local target_history, err = singletons.db.targets:for_upstream({ id = upstream_id }, { include_inactive = true })
+    local target_history, err, err_t = singletons.db.targets:for_upstream_sorted({ id = upstream_id })
     if not target_history then
-      return nil, err
+      return nil, err, err_t
     end
 
     -- perform some raw data updates
@@ -123,14 +123,7 @@ do
       local port
       target.name, port = string.match(target.target, "^(.-):(%d+)$")
       target.port = tonumber(port)
-
-      -- need exact order, so create sort-key by created-time and uuid
-      target.order = target.created_at .. ":" .. target.id
     end
-
-    table.sort(target_history, function(a,b)
-      return a.order < b.order
-    end)
 
     return target_history
   end

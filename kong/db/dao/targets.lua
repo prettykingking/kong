@@ -4,69 +4,64 @@ local utils = require "kong.tools.utils"
 
 local _TARGETS = {}
 
+local DEFAULT_PORT = 8000
+
 
 local function sort_by_order(a, b)
   return a.order > b.order
 end
+
 
 local function clean_history(self, upstream_pk)
   -- when to cleanup: invalid-entries > (valid-ones * cleanup_factor)
   local cleanup_factor = 10
 
   --cleaning up history, check if it's necessary...
-  local target_history = self:for_upstream(upstream_pk, { include_inactive = true })
+  local targets, err, err_t = self:for_upstream_sorted(upstream_pk)
+  if not targets then
+    return nil, err, err_t
+  end
 
-  if target_history then
-    -- sort the targets
-    for _,target in ipairs(target_history) do
-      target.order = target.created_at .. ":" .. target.id
-    end
+  -- do clean up
+  local cleaned = {}
+  local delete = {}
 
-    -- sort table in reverse order
-    table.sort(target_history, function(a,b) return a.order>b.order end)
-    -- do clean up
-    local cleaned = {}
-    local delete = {}
+  for _, entry in ipairs(targets) do
+    if cleaned[entry.target] then
+      -- we got a newer entry for this target than this, so this one can go
+      delete[#delete+1] = entry
 
-    for _, entry in ipairs(target_history) do
-      if cleaned[entry.target] then
-        -- we got a newer entry for this target than this, so this one can go
+    else
+      -- haven't got this one, so this is the last one for this target
+      cleaned[entry.target] = true
+      cleaned[#cleaned+1] = entry
+      if entry.weight == 0 then
         delete[#delete+1] = entry
-
-      else
-        -- haven't got this one, so this is the last one for this target
-        cleaned[entry.target] = true
-        cleaned[#cleaned+1] = entry
-        if entry.weight == 0 then
-          delete[#delete+1] = entry
-        end
       end
     end
+  end
 
-    -- do we need to cleanup?
-    -- either nothing left, or when 10x more outdated than active entries
-    if (#cleaned == 0 and #delete > 0) or
-       (#delete >= (math.max(#cleaned,1)*cleanup_factor)) then
+  -- do we need to cleanup?
+  -- either nothing left, or when 10x more outdated than active entries
+  if (#cleaned == 0 and #delete > 0) or
+     (#delete >= (math.max(#cleaned,1)*cleanup_factor)) then
 
-      ngx.log(ngx.NOTICE, "[Target DAO] Starting cleanup of target table for upstream ",
-                 tostring(upstream_pk.id))
-      local cnt = 0
-      for _, entry in ipairs(delete) do
-        -- not sending update events, one event at the end, based on the
-        -- post of the new entry should suffice to reload only once
-        self:delete(
-          { id = entry.id },
-          { quiet = true }
-        )
-        -- ignoring errors here, deleted by id, so should not matter
-        -- in case another kong-node does the same cleanup simultaneously
-        cnt = cnt + 1
-      end
-
-      ngx.log(ngx.INFO, "[Target DAO] Finished cleanup of target table",
-        " for upstream ", tostring(upstream_pk.id),
-        " removed ", tostring(cnt), " target entries")
+    ngx.log(ngx.NOTICE, "[Target DAO] Starting cleanup of target table for upstream ",
+               tostring(upstream_pk.id))
+    local cnt = 0
+    for _, entry in ipairs(delete) do
+      -- notice super - this is real delete (not creating a new entity with weight = 0)
+      -- not sending update events, one event at the end, based on the
+      -- post of the new entry should suffice to reload only once
+      self.super.delete(self, { id = entry.id })
+      -- ignoring errors here, deleted by id, so should not matter
+      -- in case another kong-node does the same cleanup simultaneously
+      cnt = cnt + 1
     end
+
+    ngx.log(ngx.INFO, "[Target DAO] Finished cleanup of target table",
+      " for upstream ", tostring(upstream_pk.id),
+      " removed ", tostring(cnt), " target entries")
   end
 end
 
@@ -110,37 +105,60 @@ function _TARGETS:delete(pk)
 end
 
 
-function _TARGETS:for_upstream(upstream_pk, options)
-  options = options or {}
-  local include_inactive = options.include_inactive
-  local include_health = options.include_health
-  local all_targets, err, err_t = self.super.for_upstream(self, upstream_pk)
-  if not all_targets then
+function _TARGETS:delete_by_target(tgt)
+  local target, err, err_t = self:select_by_target(tgt)
+  if err then
     return nil, err, err_t
   end
-  if include_inactive then
-    return all_targets
+
+  return self:insert({
+    target   = target.target,
+    upstream = target.upstream,
+    weight   = 0,
+  })
+end
+
+
+function _TARGETS:for_upstream_raw(upstream_pk, ...)
+  return self.super.for_upstream(self, upstream_pk, ...)
+end
+
+
+function _TARGETS:for_upstream_sorted(upstream_pk, ...)
+  local targets, err, err_t = self:for_upstream_raw(upstream_pk, ...)
+  if not targets then
+    return nil, err, err_t
   end
 
-  -- sort and walk based on target and creation time
-  for _, target in ipairs(all_targets) do
-    target.order = ("%s:%d:%s"):format(target.target,
-                                       target.created_at,
-                                       target.id)
+  for _,target in ipairs(targets) do
+    target.order = string.format("%d:%s",
+                                 target.created_at * 1000,
+                                 target.id)
   end
-  table.sort(all_targets, sort_by_order)
+
+  -- sort table in reverse order
+  table.sort(targets, sort_by_order)
+  return targets
+end
+
+
+function _TARGETS:for_upstream(upstream_pk, ...)
+  local sorted_targets, err, err_t = self:for_upstream_sorted(upstream_pk, ...)
+  if not sorted_targets then
+    return nil, err, err_t
+  end
 
   local seen           = {}
   local active_targets = setmetatable({}, cjson.empty_array_mt)
   local len            = 0
 
-  for _, entry in ipairs(all_targets) do
+  for _, entry in ipairs(sorted_targets) do
     if not seen[entry.target] then
       if entry.weight == 0 then
         seen[entry.target] = true
 
       else
-        entry.order = nil -- dont show our order key to the client
+        --entry.order = nil -- dont show our order key to the client
 
         -- add what we want to send to the client in our array
         len = len + 1
@@ -153,8 +171,14 @@ function _TARGETS:for_upstream(upstream_pk, options)
     end
   end
 
-  if not include_health then
-    return active_targets
+  return active_targets
+end
+
+
+function _TARGETS:for_upstream_with_health(upstream_pk, ...)
+  local active_targets, err, err_t = self:for_upstream(upstream_pk, ...)
+  if not active_targets then
+    return nil, err, err_t
   end
 
   local health_info
@@ -196,6 +220,8 @@ function _TARGETS:post_health(upstream, target, is_healthy)
                                            upstream.name)
   local cluster_events = require("kong.singletons").cluster_events
   cluster_events:broadcast("balancer:post_health", packet)
+  return true
 end
+
 
 return _TARGETS
