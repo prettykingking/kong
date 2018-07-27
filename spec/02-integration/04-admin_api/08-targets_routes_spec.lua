@@ -244,7 +244,7 @@ describe("Admin API #" .. strategy, function()
           local json = assert.response(res).has.jsonbody()
 
           -- we got three active targets for this upstream
-          --assert.equal(3, #json.data)
+          assert.equal(3, #json.data)
 
           -- when multiple active targets are present, we only see the last one
           assert.equal(apis[4].id, json.data[1].id)
