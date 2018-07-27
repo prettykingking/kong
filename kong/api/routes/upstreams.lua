@@ -18,7 +18,7 @@ local function select_target(db, target_id)
   if utils.is_valid_uuid(id) then
     return db.targets:select({ id = id })
   end
-  return db.targets:select_by_target(target_id)
+  return db.targets:select_by_target(id)
 end
 
 
