@@ -7,8 +7,23 @@ local _TARGETS = {}
 local DEFAULT_PORT = 8000
 
 
-local function sort_by_order(a, b)
+local function sort_by_reverse_order(a, b)
   return a.order > b.order
+end
+
+
+local function sort_by_order(a, b)
+  return a.order < b.order
+end
+
+
+local function add_order(targets, sort_function)
+  for _,target in ipairs(targets) do
+    target.order = string.format("%d:%s",
+                                 target.created_at * 1000,
+                                 target.id)
+  end
+  table.sort(targets, sort_function)
 end
 
 
@@ -129,30 +144,24 @@ function _TARGETS:for_upstream_sorted(upstream_pk, ...)
   if not targets then
     return nil, err, err_t
   end
+  add_order(targets, sort_by_order)
 
-  for _,target in ipairs(targets) do
-    target.order = string.format("%d:%s",
-                                 target.created_at * 1000,
-                                 target.id)
-  end
-
-  -- sort table in reverse order
-  table.sort(targets, sort_by_order)
   return targets
 end
 
 
 function _TARGETS:for_upstream(upstream_pk, ...)
-  local sorted_targets, err, err_t = self:for_upstream_sorted(upstream_pk, ...)
-  if not sorted_targets then
+  local targets, err, err_t = self:for_upstream_raw(upstream_pk, ...)
+  if not targets then
     return nil, err, err_t
   end
+  add_order(targets, sort_by_reverse_order)
 
   local seen           = {}
   local active_targets = setmetatable({}, cjson.empty_array_mt)
   local len            = 0
 
-  for _, entry in ipairs(sorted_targets) do
+  for _, entry in ipairs(targets) do
     if not seen[entry.target] then
       if entry.weight == 0 then
         seen[entry.target] = true
