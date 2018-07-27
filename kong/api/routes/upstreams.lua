@@ -9,7 +9,7 @@ local function select_upstream(db, upstream_id)
   if utils.is_valid_uuid(id) then
     return db.upstreams:select({ id = id })
   end
-  return db.upstreams:select_by_name(upstream_id)
+  return db.upstreams:select_by_name(id)
 end
 
 
