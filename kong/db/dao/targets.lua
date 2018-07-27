@@ -71,8 +71,27 @@ local function clean_history(self, upstream_pk)
 end
 
 
+local function format_target(target)
+  local p = utils.normalize_ip(target)
+  if not p then
+    return false, "Invalid target; not a valid hostname or ip address"
+  end
+  return utils.format_host(p, DEFAULT_PORT)
+end
+
+
 function _TARGETS:insert(entity)
+  if entity.target then
+    local formatted_target, err = format_target(entity.target)
+    if not formatted_target then
+      local err_t = self.errors:schema_violation({ target = err })
+      return nil, tostring(err_t), err_t
+    end
+    entity.target = formatted_target
+  end
+
   clean_history(self, entity.upstream)
+
   return self.super.insert(self, entity)
 end
 
