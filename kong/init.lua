@@ -237,6 +237,16 @@ function Kong.init_worker()
   math.randomseed()
 
 
+  -- init DB
+
+
+  local ok, err = kong.db:init_worker()
+  if not ok then
+    ngx_log(ngx_CRIT, "could not init DB: ", err)
+    return
+  end
+
+
   -- init DAO
 
 
