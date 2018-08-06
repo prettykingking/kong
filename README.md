@@ -14,7 +14,8 @@ from startups to Global 5000 as well as government organizations.
 [Documentation](https://getkong.org/docs) |
 [Forum](https://discuss.konghq.com) |
 [Blog](https://konghq.com/blog) |
-IRC (freenode): [#kong](http://webchat.freenode.net/?channels=kong)
+IRC (freenode): [#kong](http://webchat.freenode.net/?channels=kong) |
+[Nightly Releases](https://bintray.com/kong/kong-community-edition-nightly/kong-master)
 
 ## Summary
 
