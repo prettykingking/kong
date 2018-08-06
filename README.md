@@ -106,7 +106,7 @@ code, other repos are also under active development:
 - [Kong and Instaclustr](https://www.instaclustr.com/solutions/managed-cassandra-for-kong/): Let
   Instaclustr manage your Cassandra cluster.
 - [Nightly Releases](https://bintray.com/kong/kong-community-edition-nightly/kong-master): Nightly
-  releases are built by travis-ci and available on bintray.
+  releases are built by travis-ci and available for download.
 
 
 ## Development
