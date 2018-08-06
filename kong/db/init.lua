@@ -111,7 +111,7 @@ local function prefix_err(self, err)
 end
 
 
-function DB:init_connector()
+function DB:init()
   -- I/O with the DB connector singleton
   -- Implementation up to the strategy's connector. A place for:
   --   - connection check

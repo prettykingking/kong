@@ -37,7 +37,7 @@ helpers.for_each_dao(function(kong_config)
     local factory, apis, oauth2_credentials
     setup(function()
       local db = DB.new(kong_config)
-      assert(db:init_connector())
+      assert(db:init())
       factory = assert(Factory.new(kong_config, db))
       apis = factory.apis
 

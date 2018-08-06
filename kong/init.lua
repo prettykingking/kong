@@ -197,7 +197,7 @@ function Kong.init()
   kong_global.init_pdk(kong, config, nil) -- nil: latest PDK
 
   local db = assert(DB.new(config))
-  assert(db:init_connector())
+  assert(db:init())
 
   local dao = assert(DAOFactory.new(config, db)) -- instantiate long-lived DAO
   local ok, err_t = dao:init()
@@ -236,12 +236,13 @@ function Kong.init_worker()
   -- seeds.
   math.randomseed()
 
+
   -- init DAO
 
 
   local ok, err = kong.dao:init_worker()
   if not ok then
-    ngx_log(ngx_CRIT, "could not init DB: ", err)
+    ngx_log(ngx_CRIT, "could not init DAO: ", err)
     return
   end
 

@@ -15,7 +15,7 @@ local function execute(args)
          "Kong is already running in " .. conf.prefix)
 
   local db = DB.new(conf)
-  assert(db:init_connector())
+  assert(db:init())
   local dao = assert(DAOFactory.new(conf, db))
   local ok, err_t = dao:init()
   if not ok then

@@ -11,7 +11,7 @@ helpers.for_each_dao(function(kong_config)
       -- some `setup` functions also use `factory` and they run before the `before_each` chain
       -- hence we need to set it here, and again in `before_each`.
       local db = DB.new(kong_config)
-      assert(db:init_connector())
+      assert(db:init())
       factory = assert(Factory.new(kong_config, db))
       factory:drop_schema()
     end)
@@ -22,7 +22,7 @@ helpers.for_each_dao(function(kong_config)
 
     before_each(function()
       local db = DB.new(kong_config)
-      assert(db:init_connector())
+      assert(db:init())
       factory = assert(Factory.new(kong_config, db))
     end)
 
@@ -38,7 +38,7 @@ helpers.for_each_dao(function(kong_config)
           invalid_conf.cassandra_keyspace = "_inexistent_"
 
           local db = DB.new(kong_config)
-          assert(db:init_connector())
+          assert(db:init())
           local xfactory = assert(Factory.new(invalid_conf, db))
           local cur_migrations, err = xfactory:current_migrations()
           assert.is_nil(err)

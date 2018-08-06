@@ -30,7 +30,7 @@ end
 local function execute(args)
   local conf = assert(conf_loader(args.conf))
   local db = DB.new(conf)
-  assert(db:init_connector())
+  assert(db:init())
   local dao = assert(DAOFactory.new(conf, db))
 
   if args.command == "up" then

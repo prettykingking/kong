@@ -141,7 +141,7 @@ describe("#cassandra", function()
       kong_config.cassandra_local_datacenter = "my-dc"
 
       local db = DB.new(kong_config)
-      assert(db:init_connector())
+      assert(db:init())
       assert(Factory.new(kong_config, db))
     end)
   end)

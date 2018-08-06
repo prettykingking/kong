@@ -14,7 +14,7 @@ for _, strategy in helpers.each_strategy() do
     local bp
     setup(function()
       local db = assert(DB.new(helpers.test_conf, strategy))
-      assert(db:init_connector())
+      assert(db:init())
       assert(db:truncate())
       bp = assert(Blueprints.new({}, db))
     end)
@@ -75,7 +75,7 @@ dao_helpers.for_each_dao(function(kong_config)
 
   setup(function()
     local db = assert(DB.new(helpers.test_conf, kong_config.database))
-    assert(db:init_connector())
+    assert(db:init())
 
     dao = assert(Factory.new(kong_config, db))
     bp  = assert(Blueprints.new(dao, db))

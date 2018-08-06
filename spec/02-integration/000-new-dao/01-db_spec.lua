@@ -23,7 +23,12 @@ describe("kong.db.init", function()
   end)
 
 
-  describe(":init_connector()", function()
+  describe(":init()", function()
+
+  end)
+
+
+  describe(":init_worker()", function()
 
   end)
 

@@ -144,7 +144,7 @@ local function get_db_utils(strategy, tables)
 
   -- new DAO (DB module)
   local db = assert(DB.new(conf, strategy))
-  assert(db:init_connector())
+  assert(db:init())
 
   -- legacy DAO
   local dao
